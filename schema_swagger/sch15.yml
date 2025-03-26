@@ -1,0 +1,18 @@
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Recommended Product 1"
+        price:
+          type: number
+          format: float
+          example: 59.99
+        inStock:
+          type: boolean
+          example: true

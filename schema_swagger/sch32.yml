@@ -1,0 +1,49 @@
+components:
+  schemas:
+    AvailabilityRequest:
+      type: object
+      required:
+        - durationMinutes
+        - preferredStart
+        - preferredEnd
+      properties:
+        durationMinutes:
+          type: integer
+          example: 30
+        preferredStart:
+          type: string
+          format: date-time
+          example: "2025-03-27T08:00:00Z"
+        preferredEnd:
+          type: string
+          format: date-time
+          example: "2025-03-27T18:00:00Z"
+
+    TimeSlotSuggestions:
+      type: object
+      properties:
+        suggestions:
+          type: array
+          items:
+            type: object
+            properties:
+              label:
+                type: string
+                example: "Option 1: Tomorrow at 9:00 AM"
+              startTime:
+                type: string
+                format: date-time
+                example: "2025-03-27T09:00:00Z"
+              durationMinutes:
+                type: integer
+                example: 30
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "MISSING_FIELDS"
+        message:
+          type: string
+          example: "All fields are required."

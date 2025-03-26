@@ -1,0 +1,42 @@
+components:
+  schemas:
+    DocumentProcessRequest:
+      type: object
+      required:
+        - fileUrl
+        - callbackUrl
+      properties:
+        fileUrl:
+          type: string
+          format: uri
+          example: "https://storage.example.com/docs/123.pdf"
+        callbackUrl:
+          type: string
+          format: uri
+          example: "https://client.com/webhooks/doc-processed"
+
+    JobCreated:
+      type: object
+      properties:
+        jobId:
+          type: integer
+          example: 55192
+
+    DocumentProcessedEvent:
+      type: object
+      required:
+        - jobId
+        - status
+        - resultUrl
+      properties:
+        jobId:
+          type: integer
+          example: 55192
+        status:
+          type: string
+          enum: [success, failed]
+          example: "success"
+        resultUrl:
+          type: string
+          format: uri
+          example: "https://storage.example.com/results/123-summary.json"

@@ -1,0 +1,44 @@
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UpdateUser:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Updated Teammate"
+        email:
+          type: string
+          format: email
+          example: "teammate@company.com"
+        role:
+          type: string
+          enum: [admin, manager, viewer]
+          example: "manager"
+
+    User:
+      allOf:
+        - $ref: '#/components/schemas/UpdateUser'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 205
+            orgId:
+              type: string
+              example: "org_1234"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "FORBIDDEN"
+        message:
+          type: string
+          example: "You do not have permission to modify organization users."

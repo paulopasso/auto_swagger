@@ -1,0 +1,51 @@
+components:
+  schemas:
+    AdminUser:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - role
+        - permissions
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Alice Admin"
+        email:
+          type: string
+          format: email
+          example: "admin@example.com"
+        role:
+          type: string
+          enum: [admin]
+        permissions:
+          type: array
+          items:
+            type: string
+          example: ["manage_users", "view_reports"]
+
+    StandardUser:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - role
+      properties:
+        id:
+          type: integer
+          example: 2
+        name:
+          type: string
+          example: "Bob User"
+        email:
+          type: string
+          format: email
+          example: "bob@example.com"
+        role:
+          type: string
+          enum: [standard]

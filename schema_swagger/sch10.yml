@@ -1,0 +1,25 @@
+components:
+  schemas:
+    NewOrder:
+      type: object
+      required:
+        - status
+        - paymentMethod
+      properties:
+        status:
+          type: string
+          enum: [pending, confirmed, shipped]
+          example: "pending"
+        paymentMethod:
+          type: string
+          enum: [card, paypal]
+          example: "card"
+
+    Order:
+      allOf:
+        - $ref: '#/components/schemas/NewOrder'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 875

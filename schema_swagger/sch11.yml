@@ -1,0 +1,49 @@
+components:
+  schemas:
+    OrderRequest:
+      type: object
+      required:
+        - customer
+        - items
+      properties:
+        customer:
+          type: object
+          required:
+            - name
+            - email
+          properties:
+            name:
+              type: string
+              example: "Alice"
+            email:
+              type: string
+              format: email
+              example: "alice@example.com"
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderItem'
+
+    OrderItem:
+      type: object
+      required:
+        - productId
+        - quantity
+      properties:
+        productId:
+          type: integer
+          example: 101
+        quantity:
+          type: integer
+          minimum: 1
+          example: 2
+
+    OrderResponse:
+      allOf:
+        - $ref: '#/components/schemas/OrderRequest'
+        - type: object
+          properties:
+            id:
+              type: integer
+              example: 9876

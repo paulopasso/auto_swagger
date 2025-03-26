@@ -1,0 +1,68 @@
+components:
+  schemas:
+    NewUser:
+      type: object
+      required:
+        - email
+        - role
+      properties:
+        email:
+          type: string
+          format: email
+          example: "newuser@example.com"
+        name:
+          type: string
+          example: "Charlie"
+        role:
+          type: string
+          enum: [admin, user, viewer]
+          example: "user"
+
+    BulkOperationResult:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/UserSuccessResult'
+              - $ref: '#/components/schemas/UserFailureResult'
+
+    UserSuccessResult:
+      type: object
+      properties:
+        index:
+          type: integer
+          example: 0
+        status:
+          type: string
+          enum: [success]
+        user:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 9231
+            email:
+              type: string
+              format: email
+              example: "created@example.com"
+            name:
+              type: string
+              example: "Charlie"
+            role:
+              type: string
+              example: "user"
+
+    UserFailureResult:
+      type: object
+      properties:
+        index:
+          type: integer
+          example: 1
+        status:
+          type: string
+          enum: [failed]
+        error:
+          type: string
+          example: "Missing required fields"

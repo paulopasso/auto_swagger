@@ -1,0 +1,30 @@
+components:
+  schemas:
+    WeatherResponse:
+      type: object
+      properties:
+        city:
+          type: string
+          example: "Madrid"
+        temperatureCelsius:
+          type: number
+          example: 22.5
+        condition:
+          type: string
+          example: "Sunny"
+        humidity:
+          type: number
+          example: 30
+        windKph:
+          type: number
+          example: 15.2
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "NOT_FOUND"
+        message:
+          type: string
+          example: "Weather for \"Paris\" not found"

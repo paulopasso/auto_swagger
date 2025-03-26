@@ -1,0 +1,90 @@
+components:
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: Page number (starts at 1)
+      required: false
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+
+    Limit:
+      name: limit
+      in: query
+      description: Items per page
+      required: false
+      schema:
+        type: integer
+        default: 10
+        minimum: 1
+        maximum: 100
+
+    DateFrom:
+      name: from
+      in: query
+      description: Start date (inclusive)
+      required: false
+      schema:
+        type: string
+        format: date
+        example: "2025-01-01"
+
+    DateTo:
+      name: to
+      in: query
+      description: End date (inclusive)
+      required: false
+      schema:
+        type: string
+        format: date
+        example: "2025-03-26"
+
+  schemas:
+    PaginatedReports:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Report'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    Report:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 17
+        title:
+          type: string
+          example: "Quarterly Sales Summary"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2025-03-26T10:00:00Z"
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 100
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "INVALID_QUERY"
+        message:
+          type: string
+          example: "Invalid date range"
