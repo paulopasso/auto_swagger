@@ -1,0 +1,31 @@
+General:
+  ✔ Figure out what type of data we need for our project @started(25-03-26 23:42) @done(25-03-27 10:01) @lasted(10h19m14s)
+  ✔ Understand exactly what methods we could use in our process to get to generating the docs @started(25-03-27 10:01) @done(25-03-27 11:30) @lasted(1h29m)
+Initial Code Processing (WE DO THIS LAST WE NEED TO IMPLEMENT WITH UNDERSTANDING GIT ETC):
+  ☐ Set up git diff detection
+  ☐ Extract route handlers and comments
+  ☐ Basic preprocessing (whitespace, line endings)
+NLP Pipeline Implementation:
+  ☐ Set up CodeBERT for code embeddings @started(25-03-27 10:27)
+  ☐ Implement token classification for CRUD operations
+  ☐ Build NER system for code elements
+  ☐ Create semantic role labeling
+Pattern Recognition Development:
+  ☐ Implement transformer model for code patterns
+  ☐ Build context understanding system
+Documentation Analysis System:
+  ☐ Create comment classification
+  ☐ Build information extraction
+  ☐ Implement constraint detection
+Data Structure Creation:
+  ☐ Build endpoint information system
+  ☐ Create parameter organization
+  ☐ Implement response structuring
+LLM Integration:
+  ☐ Develop prompt generation
+  ☐ Set up LLM processing
+  ☐ Create output formatting
+Testing and Deployment:
+  ☐ Create test suite
+  ☐ Set up CI/CD
+  ☐ Documentation and maintenance
