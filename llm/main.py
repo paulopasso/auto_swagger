@@ -1,9 +1,10 @@
-from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from git import Repo
 import json
 from pydantic import BaseModel
 from typing import List
 import os
+import torch
 
 class Change(BaseModel):
     start_line: int      
@@ -21,7 +22,7 @@ def get_context():
     """
     {
       "codeContext": {
-        "filename": "src/app.js",
+        "filename": "swagger-example/src/app.js",
         "functionName": "CRUD Operations",
         "line": {
           "beginning": 30,
@@ -166,63 +167,75 @@ def get_context():
   )
 
 def format_prompt(context):
-  return f"""Based on the following API context, propose changes to implement Swagger documentation.
-Please respond ONLY with a JSON object in the following exact format, no other text:
+    return f"""You are an expert in API documentation. Given the API context below, generate JSDoc Swagger documentation comments for the existing Express.js routes.
 
+Rules:
+1. ONLY output JSDoc comments starting with /** and ending with */
+2. Include @swagger annotations for each endpoint
+3. DO NOT include any actual route code or implementation
+4. DO NOT suggest creating new files
+5. DO NOT modify existing code
+6. Each change should ONLY contain JSDoc documentation comments
+
+The response MUST be a valid JSON object in this exact format:
 {{
   "changes": [
     {{
-      "start_line": number,      // The line number where changes should start
-      "end_line": number,        // The line number where changes should end
-      "filepath": string,        // The full path to the file being modified
-      "code": string,           // The complete code snippet including the changes
-      "description": string     // Brief description of what the change does
+      "start_line": number,      // Line number where the JSDoc comment should start
+      "end_line": number,        // Line number where the existing route starts (exclusive)
+      "filepath": string,        // Path to the file containing the route
+      "code": string,           // ONLY the JSDoc Swagger documentation comment
+      "description": string     // Brief description of the documentation added
     }}
   ]
 }}
 
-For example:
-{{
-  "changes": [
-    {{
-      "start_line": 15,
-      "end_line": 45,
-      "filepath": "src/app.js",
-      "code": "/**\\n * @swagger\\n * /api/users:\\n *   post:\\n *     summary: Create user\\n */\\napp.post('/api/users', ...)",
-      "description": "Added Swagger documentation for user creation endpoint"
-    }}
-  ]
-}}
-
-Context:
-{context}
-
-JSON Response:
-"""
+API Context:
+{context}"""
 
 def extract_json_from_response(response) -> Changes | None:
-  try:
-    # Get the generated text from the response
-    text = response[0]['generated_text']
-    
-    # Find the start of the JSON (after our prompt)
-    json_start = text.find('{\n')
-    if json_start == -1:
-      json_start = text.find('{')
-    
-    if json_start == -1:
-      raise ValueError("No JSON found in response")
-      
-    json_text = text[json_start:]
-    
-    # Parse JSON and validate with Pydantic
-    json_data = json.loads(json_text)
-    return Changes(**json_data)
-    
-  except Exception as e:
-    print(f"Error extracting JSON from response: {e}")
-    print("Raw response:", text)
-    return None
+    try:
+        # Get the generated text from the response
+        text = response[0]['generated_text']
+        
+        print("\nDebug - Full response text:")
+        print(text)
+        
+        # Find the JSON between markdown code blocks
+        start_marker = "```json"
+        if start_marker not in text:
+            start_marker = "```"  # Fallback if json tag is not specified
+            
+        json_start = text.find(start_marker)
+        if json_start == -1:
+            # Fallback to looking for just a JSON object if no code blocks found
+            json_start = text.find('{')
+            if json_start == -1:
+                raise ValueError("No JSON found in response")
+            json_text = text[json_start:]
+        else:
+            # Extract text between ``` markers
+            json_start = text.find('{', json_start)
+            json_end = text.find('```', json_start)
+            json_text = text[json_start:json_end].strip() if json_end != -1 else text[json_start:].strip()
+        
+        print("\nDebug - Extracted JSON text:")
+        print(json_text)
+        
+        # Parse JSON and validate with Pydantic
+        json_data = json.loads(json_text)
+        
+        print("\nDebug - Parsed JSON data:")
+        print(json_data)
+        
+        return Changes(**json_data)
+        
+    except Exception as e:
+        print(f"\nError extracting JSON from response: {e}")
+        if 'text' in locals():
+            print("\nRaw text that caused the error:")
+            print(text)
+        return None
 
 def apply_file_changes(change: Change) -> bool:
     """
@@ -266,25 +279,51 @@ def main():
     # Define prompt with explicit JSON structure request
     prompt = format_prompt(context)
     
-    print("The current prompt we are using:")
-    print(prompt)
-    
-    # Initialize the pipeline with better parameters for JSON generation
-    pipe = pipeline(
-        "text-generation",
-        model="deepseek-ai/deepseek-coder-1.3b-base",
-        max_new_tokens=2048,
-        num_return_sequences=1,
-        do_sample=True,        # Enable sampling
-        temperature=0.7,       # Lower temperature for more focused outputs
-        top_p=0.95,           # Nucleus sampling parameter
-        top_k=50,             # Top-k sampling parameter
-        repetition_penalty=1.1 # Prevent repetitive text
-    )
-    
-    # Generate with error handling
     try:
-        response = pipe(prompt)
+        tokenizer = AutoTokenizer.from_pretrained(
+            "deepseek-ai/deepseek-coder-1.3b-instruct",  
+            trust_remote_code=True
+        )
+        model = AutoModelForCausalLM.from_pretrained(
+            "deepseek-ai/deepseek-coder-1.3b-instruct",  
+            trust_remote_code=True,
+            torch_dtype=torch.bfloat16  
+        )
+        
+        # Move to GPU if available
+        device = torch.device("mps" if torch.mps.is_available() else "cpu")
+        model = model.to(device)
+        
+        # Format as chat messages
+        messages = [
+            {'role': 'user', 'content': prompt}
+        ]
+        
+        # Apply chat template and generate
+        inputs = tokenizer.apply_chat_template(
+            messages,
+            add_generation_prompt=True,
+            return_tensors="pt"
+        ).to(device)
+        
+        outputs = model.generate(
+            inputs,
+            max_new_tokens=4096,
+            do_sample=False,
+            top_k=50,
+            top_p=0.95,
+            num_return_sequences=1,
+            eos_token_id=tokenizer.eos_token_id
+        )
+        
+        # Get the generated text (exactly as in docs)
+        generated_text = tokenizer.decode(outputs[0][len(inputs[0]):], skip_special_tokens=True)
+        
+        # Create response format matching pipeline output for compatibility
+        response = [{"generated_text": generated_text}]
+        print("\nRaw response:")
+        print(response)
+        
         changes = extract_json_from_response(response)
         
         if changes:
@@ -325,3 +364,6 @@ def main():
             
     except Exception as e:
         print(f"Error during execution: {e}")
+
+if __name__ == "__main__":
+    main()
