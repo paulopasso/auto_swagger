@@ -1,0 +1,6 @@
+General:
+  ✔ Figure out what type of data we need for our project @started(25-03-26 23:42) @done(25-03-27 10:01) @lasted(10h19m14s)
+  ✔ Understand exactly what methods we could use in our process to get to generating the docs @started(25-03-27 10:01) @done(25-03-27 11:30) @lasted(1h29m)
+LLM Integrqation:
+  - Fix the comments inserting into correct places @started(25-04-20 12:33)
+  - Refactor to use the github api instead
