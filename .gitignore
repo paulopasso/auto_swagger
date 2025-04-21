@@ -1,1 +1,107 @@
 .qodo
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build Artifacts
+build/
+dist/
+out/
+target/
+bin/
+obj/
+
+# Dependency Directories
+node_modules/
+vendor/
+bower_components/
+jspm_packages/
+web_modules/
+
+# Logs and Databases
+*.log
+*.sql
+*.sqlite
+
+# Temporary Files
+*.tmp
+*.swp
+*~
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.nox/
+.coverage
+.hypothesis/
+.pytest_cache/
+htmlcov/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Node.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json # Consider keeping if you want exact dependency versions locked
+yarn.lock         # Consider keeping if you want exact dependency versions locked
+pnpm-lock.yaml    # Consider keeping if you want exact dependency versions locked
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# Gradle
+.gradle
+build/
+# Allow *.gradle files, which should be version-controlled
+!*.gradle
+
+# Sensitive Information (Ensure these are never committed)
+.env
+*.pem
+*.key
+credentials.*
+config.*
+
+# Other common temporary/generated files
+*.bak
+*.cache
+*.diff
+*.patch
+*.orig
