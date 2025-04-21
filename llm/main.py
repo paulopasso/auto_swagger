@@ -1,498 +1,74 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from git import Repo
 import json
-from pydantic import BaseModel
 from typing import List
 import os
 import torch
+from context import get_context
 
-class Change(BaseModel):
-    start_line: int      
-    end_line: int        
-    filepath: str        
-    code: str           
-    description: str     
+system_prompt = """You are an expert in API documentation specializing in JSDoc Swagger comments. Your ONLY task is to GENERATE Swagger documentation, NOT create scripts or tools.
 
-class Changes(BaseModel):
-    changes: List[Change]
+IMPORTANT: 
+- DO NOT generate any JavaScript code or scripts
+- DO NOT create tools or utilities
+- ONLY generate Swagger documentation in the specified JSON format
 
-# FIXME: This will be removed integrated with paul's code
-def get_context():
-    return [
-        # User Routes
-        {
-            "codeContext": {
-                "filename": "swagger-example/src/app.js",
-                "functionName": "Create User",
-                "line": {
-                    "beginning": 39,
-                    "end": 55
-                },
-                "general_purpose": "Create a new user with name and email"
-            },
-            "apiDetails": {
-                "users": {
-                    "endpoint": {
-                        "path": "/api/users",
-                        "methods": ["POST"],
-                        "resourceType": "User"
-                    },
-                    "parameters": {
-                        "body": {
-                            "name": { "type": "string", "required": True },
-                            "email": { "type": "string", "required": True, "format": "email" }
-                        }
-                    },
-                    "responses": {
-                        "success": {
-                            "create": {
-                                "statusCode": 201,
-                                "description": "User created successfully"
-                            }
-                        },
-                        "error": {
-                            "400": {
-                                "description": "Invalid input parameters",
-                                "conditions": ["Missing required fields"]
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        {
-            "codeContext": {
-                "filename": "swagger-example/src/app.js",
-                "functionName": "Get All Users",
-                "line": {
-                    "beginning": 57,
-                    "end": 59
-                },
-                "general_purpose": "Retrieve all users"
-            },
-            "apiDetails": {
-                "users": {
-                    "endpoint": {
-                        "path": "/api/users",
-                        "methods": ["GET"],
-                        "resourceType": "User"
-                    },
-                    "responses": {
-                        "success": {
-                            "get_all": {
-                                "statusCode": 200,
-                                "description": "List of all users"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        {
-            "codeContext": {
-                "filename": "swagger-example/src/app.js",
-                "functionName": "Get User by ID",
-                "line": {
-                    "beginning": 61,
-                    "end": 68
-                },
-                "general_purpose": "Retrieve a specific user by their ID"
-            },
-            "apiDetails": {
-                "users": {
-                    "endpoint": {
-                        "path": "/api/users/{id}",
-                        "methods": ["GET"],
-                        "resourceType": "User"
-                    },
-                    "parameters": {
-                        "path": {
-                            "id": { 
-                                "type": "integer",
-                                "required": True,
-                                "description": "User ID"
-                            }
-                        }
-                    },
-                    "responses": {
-                        "success": {
-                            "get_one": {
-                                "statusCode": 200,
-                                "description": "Single user details"
-                            }
-                        },
-                        "error": {
-                            "404": {
-                                "description": "User not found",
-                                "conditions": ["ID does not exist"]
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        {
-            "codeContext": {
-                "filename": "swagger-example/src/app.js",
-                "functionName": "Update User",
-                "line": {
-                    "beginning": 70,
-                    "end": 89
-                },
-                "general_purpose": "Update a user's information"
-            },
-            "apiDetails": {
-                "users": {
-                    "endpoint": {
-                        "path": "/api/users/{id}",
-                        "methods": ["PUT"],
-                        "resourceType": "User"
-                    },
-                    "parameters": {
-                        "path": {
-                            "id": { 
-                                "type": "integer",
-                                "required": True,
-                                "description": "User ID"
-                            }
-                        },
-                        "body": {
-                            "name": { "type": "string", "required": False },
-                            "email": { "type": "string", "required": False, "format": "email" }
-                        }
-                    },
-                    "responses": {
-                        "success": {
-                            "update": {
-                                "statusCode": 200,
-                                "description": "User updated successfully"
-                            }
-                        },
-                        "error": {
-                            "404": {
-                                "description": "User not found",
-                                "conditions": ["ID does not exist"]
-                            },
-                            "400": {
-                                "description": "Invalid input parameters",
-                                "conditions": ["At least one field must be provided"]
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        {
-            "codeContext": {
-                "filename": "swagger-example/src/app.js",
-                "functionName": "Delete User",
-                "line": {
-                    "beginning": 91,
-                    "end": 98
-                },
-                "general_purpose": "Delete a user by their ID"
-            },
-            "apiDetails": {
-                "users": {
-                    "endpoint": {
-                        "path": "/api/users/{id}",
-                        "methods": ["DELETE"],
-                        "resourceType": "User"
-                    },
-                    "parameters": {
-                        "path": {
-                            "id": { 
-                                "type": "integer",
-                                "required": True,
-                                "description": "User ID"
-                            }
-                        }
-                    },
-                    "responses": {
-                        "success": {
-                            "delete": {
-                                "statusCode": 204,
-                                "description": "User deleted successfully"
-                            }
-                        },
-                        "error": {
-                            "404": {
-                                "description": "User not found",
-                                "conditions": ["ID does not exist"]
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        # Item Routes
-        {
-            "codeContext": {
-                "filename": "swagger-example/src/app.js",
-                "functionName": "Create Item",
-                "line": {
-                    "beginning": 101,
-                    "end": 118
-                },
-                "general_purpose": "Create a new item with name, description, price, and optional category"
-            },
-            "apiDetails": {
-                "items": {
-                    "endpoint": {
-                        "path": "/api/items",
-                        "methods": ["POST"],
-                        "resourceType": "Item"
-                    },
-                    "parameters": {
-                        "body": {
-                            "name": { "type": "string", "required": True },
-                            "description": { "type": "string", "required": True },
-                            "price": { "type": "number", "required": True },
-                            "category": { "type": "string", "required": False, "default": "uncategorized" }
-                        }
-                    },
-                    "responses": {
-                        "success": {
-                            "create": {
-                                "statusCode": 201,
-                                "description": "Item created successfully"
-                            }
-                        },
-                        "error": {
-                            "400": {
-                                "description": "Invalid input parameters",
-                                "conditions": ["Missing required fields"]
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        {
-            "codeContext": {
-                "filename": "swagger-example/src/app.js",
-                "functionName": "Get All Items",
-                "line": {
-                    "beginning": 120,
-                    "end": 129
-                },
-                "general_purpose": "Retrieve all items with optional category filter"
-            },
-            "apiDetails": {
-                "items": {
-                    "endpoint": {
-                        "path": "/api/items",
-                        "methods": ["GET"],
-                        "resourceType": "Item"
-                    },
-                    "parameters": {
-                        "query": {
-                            "category": {
-                                "type": "string",
-                                "required": False,
-                                "description": "Filter items by category"
-                            }
-                        }
-                    },
-                    "responses": {
-                        "success": {
-                            "get_all": {
-                                "statusCode": 200,
-                                "description": "List of all items",
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object",
-                                        "properties": {
-                                            "id": { "type": "integer" },
-                                            "name": { "type": "string" },
-                                            "description": { "type": "string" },
-                                            "price": { "type": "number" },
-                                            "category": { "type": "string" },
-                                            "createdAt": { "type": "string", "format": "date-time" }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        {
-            "codeContext": {
-                "filename": "swagger-example/src/app.js",
-                "functionName": "Get Item by ID",
-                "line": {
-                    "beginning": 131,
-                    "end": 138
-                },
-                "general_purpose": "Retrieve a specific item by its ID"
-            },
-            "apiDetails": {
-                "items": {
-                    "endpoint": {
-                        "path": "/api/items/{id}",
-                        "methods": ["GET"],
-                        "resourceType": "Item"
-                    },
-                    "parameters": {
-                        "path": {
-                            "id": { 
-                                "type": "integer",
-                                "required": True,
-                                "description": "Item ID"
-                            }
-                        }
-                    },
-                    "responses": {
-                        "success": {
-                            "get_one": {
-                                "statusCode": 200,
-                                "description": "Single item details"
-                            }
-                        },
-                        "error": {
-                            "404": {
-                                "description": "Item not found",
-                                "conditions": ["ID does not exist"]
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        {
-            "codeContext": {
-                "filename": "swagger-example/src/app.js",
-                "functionName": "Update Item",
-                "line": {
-                    "beginning": 140,
-                    "end": 161
-                },
-                "general_purpose": "Update an item's information"
-            },
-            "apiDetails": {
-                "items": {
-                    "endpoint": {
-                        "path": "/api/items/{id}",
-                        "methods": ["PUT"],
-                        "resourceType": "Item"
-                    },
-                    "parameters": {
-                        "path": {
-                            "id": { 
-                                "type": "integer",
-                                "required": True,
-                                "description": "Item ID"
-                            }
-                        },
-                        "body": {
-                            "name": { "type": "string", "required": False },
-                            "description": { "type": "string", "required": False },
-                            "price": { "type": "number", "required": False },
-                            "category": { "type": "string", "required": False }
-                        }
-                    },
-                    "responses": {
-                        "success": {
-                            "update": {
-                                "statusCode": 200,
-                                "description": "Item updated successfully"
-                            }
-                        },
-                        "error": {
-                            "404": {
-                                "description": "Item not found",
-                                "conditions": ["ID does not exist"]
-                            },
-                            "400": {
-                                "description": "Invalid input parameters",
-                                "conditions": ["At least one field must be provided"]
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        {
-            "codeContext": {
-                "filename": "swagger-example/src/app.js",
-                "functionName": "Delete Item",
-                "line": {
-                    "beginning": 163,
-                    "end": 170
-                },
-                "general_purpose": "Delete an item by its ID"
-            },
-            "apiDetails": {
-                "items": {
-                    "endpoint": {
-                        "path": "/api/items/{id}",
-                        "methods": ["DELETE"],
-                        "resourceType": "Item"
-                    },
-                    "parameters": {
-                        "path": {
-                            "id": { 
-                                "type": "integer",
-                                "required": True,
-                                "description": "Item ID"
-                            }
-                        }
-                    },
-                    "responses": {
-                        "success": {
-                            "delete": {
-                                "statusCode": 204,
-                                "description": "Item deleted successfully"
-                            }
-                        },
-                        "error": {
-                            "404": {
-                                "description": "Item not found",
-                                "conditions": ["ID does not exist"]
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    ]
+Your output MUST be a single JSON object containing Swagger documentation comments like this:
+
+{
+  "changes": [
+    {
+      "filepath": "swagger-example/src/app.js",
+      "code": "/**\\n * @swagger\\n * /api/users:\\n *   post:\\n *     tags:\\n *       - Users\\n *     summary: Create user\\n *     responses:\\n *       201:\\n *         description: Created\\n */",
+      "description": "Documentation for create user endpoint"
+    }
+  ]
+}
+"""
+
+class Change():
+    def __init__(self, start_line: int, end_line: int, filepath: str, code: str, description: str):
+        self.start_line = start_line
+        self.end_line = end_line
+        self.filepath = filepath
+        self.code = code
+        self.description = description
+
+class Changes():
+    def __init__(self, changes: List[Change]):
+        self.changes = changes
 
 def format_prompt(context):
-    return f"""Generate JSDoc Swagger documentation comments for each route in the API context below.
+    return f"""TASK: Generate Swagger documentation comments for the provided API routes.
 
-Expected JSON Structure:
+DO NOT:
+❌ Create JavaScript scripts or tools
+❌ Write code to extract comments
+❌ Generate anything other than Swagger documentation
+
+DO:
+✅ Generate a single JSON object with Swagger documentation
+✅ Follow the exact format shown below
+✅ Include all required Swagger elements (path, method, tags, etc.)
+
+Required Format:
+```json
 {{
   "changes": [
     {{
-      "start_line": number,      // Route's beginning line MINUS 1 (to insert before route)
-      "end_line": number,        // Same as route's beginning line
-      "filepath": string,        // Path to the file
-      "code": string,           // JSDoc Swagger documentation comment
-      "description": string     // Brief description of the documentation
-    }}
-  ]
-}}
-
-Example (for reference):
-{{
-  "changes": [
-    {{ 
-      "start_line": 37,          // Route starts at 38, so we use 37 to place comment before
-      "end_line": 38,           // Route's original start line
       "filepath": "swagger-example/src/app.js",
-      "code": "/**\\n * @swagger\\n * /api/users:\\n *   post:\\n *     summary: Create a new user\\n */",
-      "description": "Post request for the users"
-    }}
+      "code": "/**\\n * @swagger\\n * /api/users:\\n *   post:\\n *     tags:\\n *       - Users\\n *     summary: Create user\\n *     requestBody:\\n *       required: true\\n *       content:\\n *         application/json:\\n *           schema:\\n *             type: object\\n *             properties:\\n *               name:\\n *                 type: string\\n *     responses:\\n *       201:\\n *         description: Created\\n */",
+      "description": "Documentation for create user endpoint"
+    }},
+    // ... and so on with several changes
   ]
 }}
+```
 
 API Context:
 {json.dumps(context, indent=2)}"""
 
-def extract_json_from_response(response) -> Changes | None:
+def convert_to_changes(response, context) -> Changes | None:
     try:
         # Get the generated text from the response
         text = response[0]['generated_text']
@@ -521,13 +97,87 @@ def extract_json_from_response(response) -> Changes | None:
         print("\nDebug - Extracted JSON text:")
         print(json_text)
         
-        # Parse JSON and validate with Pydantic
+        # Parse JSON
         json_data = json.loads(json_text)
         
-        print("\nDebug - Parsed JSON data:")
-        print(json_data)
+        # Validate that we have the expected number of changes
+        if len(json_data['changes']) != len(context):
+            print(f"\nWarning: Number of changes ({len(json_data['changes'])}) does not match context length ({len(context)})")
+            print("This could indicate an incomplete or incorrect response from the LLM")
+            return None
         
-        return Changes(**json_data)
+        print("\nDebug - Sorted changes:")
+        for idx, change in enumerate(json_data['changes']):
+            print(f"\nChange {idx + 1}:")
+            print(f"File: {change['filepath']}")
+            print(f"Description: {change['description']}")
+            print("Code to insert:")
+            print(change['code'])
+        
+        # Keep track of line offsets for each file
+        file_offsets = {}   # "filepath (str): offset (int)"
+        
+        # Process each change to add line numbers
+        processed_changes = []
+        for i, change_data in enumerate(json_data['changes']):
+            # Get matching context entry directly using the same index
+            matching_context = context[i]
+            
+            if matching_context['codeContext']['filename'] == change_data['filepath']:
+                filepath = change_data['filepath']
+                
+                # Get current offset for this file
+                current_offset = file_offsets.get(filepath, 0)
+                
+                # Get the original line where we want to insert
+                original_line = matching_context['codeContext']['line']['beginning']
+                
+                # Calculate end_line (where the route begins) with current offset
+                end_line = original_line + current_offset
+                
+                # Calculate number of lines in the new code
+                code_lines = change_data['code'].count('\n') + 1
+                
+                # Calculate start_line
+                start_line = end_line - code_lines
+                
+                print(f"\nDebug - Line number calculation for {change_data['filepath']}:")
+                print(f"Original route start line: {matching_context['codeContext']['line']['beginning']}")
+                print(f"Current offset: {current_offset}")
+                print(f"End line (route start + offset): {end_line}")
+                print(f"Number of lines in new code: {code_lines}")
+                print(f"Start line (adjusted): {start_line}")
+                
+                # Create Change object
+                change = Change(
+                    start_line=start_line,
+                    end_line=end_line,
+                    filepath=filepath,
+                    code=change_data['code'],
+                    description=change_data['description']
+                )
+                processed_changes.append(change)
+                
+                # Update the offset for this file
+                file_offsets[filepath] = current_offset + code_lines
+                print(f"New offset for file: {file_offsets[change_data['filepath']]}")
+            else:
+                print(f"\nWarning: Context mismatch for file {change_data['filepath']}")
+                print(f"Expected: {change_data['filepath']}")
+                print(f"Got: {matching_context['codeContext']['filename']}")
+                raise Exception(f"Context mismatch: LLM generated documentation for wrong file order")
+        
+        print("\nDebug - Final processed changes:")
+        for idx, change in enumerate(processed_changes):
+            print(f"\nProcessed Change {idx + 1}:")
+            print(f"File: {change.filepath}")
+            print(f"Start line: {change.start_line}")
+            print(f"End line: {change.end_line}")
+            print(f"Description: {change.description}")
+            print("Code:")
+            print(change.code)
+        
+        return Changes(changes=processed_changes)
         
     except Exception as e:
         print(f"\nError extracting JSON from response: {e}")
@@ -552,13 +202,13 @@ def apply_file_changes(change: Change) -> bool:
                 lines = f.readlines()
         
         # If file is empty or doesn't exist, initialize with enough empty lines
-        while len(lines) < change.start_line:
+        while len(lines) < change.end_line:
             lines.append('\n')
             
         # Determine the indentation of the target line if it exists
         target_indentation = ''
-        if change.start_line < len(lines):
-            target_line = lines[change.start_line]
+        if change.end_line < len(lines):
+            target_line = lines[change.end_line]
             target_indentation = ' ' * (len(target_line) - len(target_line.lstrip()))
         
         # Process the new code lines with proper indentation
@@ -571,14 +221,9 @@ def apply_file_changes(change: Change) -> bool:
             # Add indentation to non-empty lines
             new_code_lines.append(f"{target_indentation}{line}\n")
         
-        # For insertions (like JSDoc comments), we insert before the target line
-        # This is determined by checking if start_line equals end_line
-        if change.start_line == change.end_line:
-            # This is an insertion case - insert without removing anything
-            lines[change.start_line:change.start_line] = new_code_lines
-        else:
-            # This is a replacement case - replace the specified range
-            lines[change.start_line:change.end_line] = new_code_lines
+        # Insert the new lines at the correct position
+        # Split the file at the insertion point and combine with new lines
+        lines = lines[:change.end_line] + new_code_lines + lines[change.end_line:]
         
         # Write back to file
         with open(change.filepath, 'w') as f:
@@ -614,21 +259,7 @@ def main():
         
         # Format as chat messages
         messages = [
-            {'role': 'system', 'content': '''You are an expert in API documentation specializing in JSDoc Swagger comments. Your task is to analyze API routes and generate precise documentation.
-
-Rules:
-1. Output ONLY a single JSON object with a "changes" array
-2. NO explanatory text, numbered sections, or markdown
-3. NO text outside the JSON object
-4. Line number handling:
-   - start_line: SUBTRACT 1 from the route's beginning line to place comment before route
-   - end_line: use the route's beginning line (unchanged)
-   Example: if route is at lines 38-53, use start_line: 37, end_line: 38
-5. Each JSDoc comment must:
-   - Start with /** and end with */
-   - Include @swagger annotations
-   - Document only the API, not implementation
-6. Never suggest creating new files or modifying existing code'''}, 
+            {'role': 'system', 'content': system_prompt}, 
             {'role': 'user', 'content': prompt}
         ]
         
@@ -651,13 +282,13 @@ Rules:
                 
                 outputs = model.generate(
                     inputs,
-                    max_new_tokens=4096,
-                    do_sample=True,  # Use sampling after first attempt
-                    temperature=0.2, 
+                    max_new_tokens=8192,
+                    do_sample=True,
+                    temperature=0.2,
                     top_k=50,
                     top_p=0.95,
                     num_return_sequences=1,
-                    eos_token_id=tokenizer.eos_token_id
+                    eos_token_id=tokenizer.eos_token_id,
                 )
                 
                 # Get the generated text
@@ -669,7 +300,7 @@ Rules:
                 print(response)
                 
                 # Try to extract and validate JSON
-                changes = extract_json_from_response(response)
+                changes = convert_to_changes(response, context)
                 
                 if changes and not isinstance(changes.changes, list):
                     print(f"\nInvalid changes format in attempt {attempt} - not a list")
