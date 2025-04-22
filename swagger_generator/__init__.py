@@ -10,7 +10,6 @@ from .models import Change
 from .git_handler import GitHandler
 from .file_handler import FileHandler
 from .llm_handler import LLMHandler
-from .context import get_context
 
 __version__ = "0.1.0"
 __all__ = [
