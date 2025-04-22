@@ -4,7 +4,7 @@ import os
 import spacy
 from spacy.lang.en import English
 
-#NLP Used: POS Tagging, NER, and Regex
+# NLP Used: POS Tagging, NER, and Regex
 
 class ApiDocParser:
     def __init__(self, js_filepath):
@@ -750,28 +750,3 @@ class ApiDocParser:
                 }
             })
         return docs
-
-
-
-# Example usage
-if __name__ == "__main__":
-    js_file_to_parse = input("Enter the path to the JavaScript API file: ")
-
-    if not js_file_to_parse:
-        print("No file path provided.")
-    else:
-        try:
-            parser = ApiDocParser(js_file_to_parse)
-            extracted_data = parser.extract_api_info()
-
-            if extracted_data:
-                print(json.dumps(extracted_data, indent=2))
-            else:
-                print(f"Could not extract any API information from {js_file_to_parse}")
-
-        except FileNotFoundError as e:
-            print(e)
-        except Exception as e:
-            print(f"An unexpected error occurred: {e}")
-            import traceback
-            traceback.print_exc()  # Print full trace for debugging
