@@ -6,7 +6,9 @@ from swagger_generator.models import Change
 from swagger_generator.git_handler import GitHandler
 from swagger_generator.file_handler import FileHandler
 from swagger_generator.llm_handler import LLMHandler
-#FIXME: Remove this line hardcoded for testing
+# TODO: Add functionality for connecting this
+from parser import ApiDocParser
+# FIXME: Remove this line hardcoded for testing
 from context import get_context
 
 def parse_args() -> argparse.Namespace:
@@ -25,8 +27,6 @@ def process_changes(changes: list[Change], git_handler: GitHandler) -> None:
     if not changes:
         return
     
-    # Sort changes by filepath and line number
-        
     print("\nProposed changes:")
     for change in changes:
         print(f"\nFile: {change.filepath}")
