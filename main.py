@@ -65,44 +65,29 @@ def process_changes(changes: list[Change], git_handler: GitHandler) -> None:
         git_handler.commit_changes(successful_changes)
 
 
-def save_parser_output(
-    api_context: dict, changed_files: Set[str], repo_path: str
-) -> None:
-    """Save parser output to a JSON file with timestamp."""
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    # Add more debug information
-    output = {
-        "timestamp": timestamp,
-        "changed_files": list(changed_files),
-        "repo_path": str(repo_path),
-        "file_details": [
-            {
-                "file": file,
-                "full_path": str(Path(repo_path) / file),
-                "exists": Path(repo_path).joinpath(file).exists(),
-            }
-            for file in changed_files
-        ],
-        "parser_output": api_context,
-        "parser_output_type": str(type(api_context)),
-    }
-
-    output_dir = Path("debug_output")
-    output_dir.mkdir(exist_ok=True)
-
-    output_file = output_dir / f"parser_output_{timestamp}.json"
-    with open(output_file, "w") as f:
-        json.dump(output, f, indent=2)
-    print(f"\nParser output saved to: {output_file}")
-
-    # Print summary of saved data
-    print("\nOutput Summary:")
-    print(f"- Number of changed files: {len(changed_files)}")
-    print(f"- Parser output type: {type(api_context)}")
-    print(
-        f"- Parser output keys: {list(api_context.keys()) if isinstance(api_context, dict) else 'N/A'}"
-    )
+def parse_files_with_context(file_paths: list[str], repo_path: str) -> list:
+    """Parse files with repository context for proper relative paths.
+    
+    Args:
+        file_paths: List of absolute file paths to parse
+        repo_path: Path to the repository root
+        
+    Returns:
+        list: Flattened list of API documentation objects, matching context.py format
+    """
+    all_routes = []
+    for filepath in file_paths:
+        if ApiDocParser.is_api_file(filepath):
+            try:
+                # Create parser with repo context for proper relative paths
+                parser = ApiDocParser(filepath, repo_root=repo_path)
+                docs = parser.extract_api_info()
+                if docs:  # Only include if API docs were found
+                    # Append each route to the flattened list
+                    all_routes.extend(docs)
+            except Exception as e:
+                print(f"Error parsing {filepath}: {str(e)}")
+    return all_routes
 
 
 def main():
@@ -149,14 +134,9 @@ def main():
         for path in full_paths:
             print(f"- {path}")
 
-        api_context = ApiDocParser.parse_files(full_paths)  # Use full paths
-        print("\nParser output summary:")
-        print(
-            f"Context keys: {list(api_context.keys()) if api_context else 'Empty context'}"
-        )
-
-        # Enhanced parser output saving
-        save_parser_output(api_context, changed_files, args.repo_path)
+        # Use parse_files_with_context to get flattened array of routes
+        api_context = parse_files_with_context(full_paths, args.repo_path)
+        print(f"\nFound {len(api_context)} API routes to document")
 
         # Generate documentation using LLM
         changes = llm_handler.generate_documentation(api_context)
