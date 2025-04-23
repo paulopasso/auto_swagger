@@ -72,6 +72,8 @@ IMPORTANT:
 - DO NOT generate any JavaScript code or scripts
 - DO NOT create tools or utilities
 - ONLY generate Swagger documentation in the specified JSON format
+- ALWAYS quote error descriptions that contain colons to avoid YAML parsing errors
+- For error descriptions like "error: Not found", wrap them in single quotes like 'error: Not found'
 
 Your output MUST be a single JSON object containing Swagger documentation comments like this:
 
@@ -80,7 +82,7 @@ Your output MUST be a single JSON object containing Swagger documentation commen
   "changes": [
     {{
       "filepath": "<FILEPATH>",
-      "code": "/**\\n * @swagger\\n * /api/users:\\n *   post:\\n *     tags:\\n *       - Users\\n *     summary: Create user\\n *     requestBody:\\n *       required: true\\n *       content:\\n *         application/json:\\n *           schema:\\n *             type: object\\n *             properties:\\n *               name:\\n *                 type: string\\n *     responses:\\n *       201:\\n *         description: Created\\n */",
+      "code": "/**\\n * @swagger\\n * /api/users:\\n *   post:\\n *     tags:\\n *       - Users\\n *     summary: Create user\\n *     requestBody:\\n *       required: true\\n *       content:\\n *         application/json:\\n *           schema:\\n *             type: object\\n *             properties:\\n *               name:\\n *                 type: string\\n *     responses:\\n *       201:\\n *         description: Created\\n *       400:\\n *         description: 'Bad request: Invalid input'\\n */",
       "description": "Documentation for create user endpoint"
     }},
     // ... and so on with several changes

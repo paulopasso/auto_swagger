@@ -1,97 +1,124 @@
-### Our process
+# Auto Swagger Documentation Generator
 
-The PURPOSE of doing these NLP techniques before hand is that it allows for better context understanding for the LLM and reduced toke usage from it. Furthermore, as it is more specific it allows for the responses to be higher quality. By having more fine grain control in this pipeline we also get more control in WHAT we can do with the response of the data. So then, we can put these changes automatically in the codebase.
+A sophisticated tool that automatically generates Swagger/OpenAPI documentation for Express.js APIs using advanced NLP techniques and LLMs.
 
-1. Initial Code Processing
+## Overview
 
-   - Git Diff Detection
-     - Identify changed files
-   - Code Extraction
-     - Extract route handlers
-     - Extract existing comments
-   - Basic Preprocessing
-     - Remove unnecessary whitespace
-     - Normalize line endings
+This project combines Natural Language Processing (NLP) techniques with Large Language Models (LLMs) to automatically generate high-quality API documentation. By preprocessing code with NLP before sending it to LLMs, we achieve:
 
-2. NLP Analysis Pipeline
+- Better context understanding
+- Reduced token usage
+- More specific and higher quality responses
+- Fine-grained control over the documentation pipeline
+- Automated code base updates
 
-   - CodeBERT Processing
-     - Generate code embeddings
-     - Semantic code understanding
-   - Token Classification
-     - CRUD operation detection
-     - API endpoint classification
-   - Named Entity Recognition (NER)
-     - Route paths
-     - HTTP methods
-     - Variable names
-     - Function names
-     - Status codes
-   - Semantic Role Labeling
-     - Action identification
-     - Resource detection
-     - Parameter role assignment
+## Features
 
-3. Pattern Recognition
+- Automatic API route detection
+- Intelligent parameter inference
+- Response schema generation
+- Validation rules detection
+- Swagger/OpenAPI compliant output
+- Support for Express.js routes
+- Automated documentation insertion
 
-   - Transformer Model Analysis
-     - CRUD patterns
-     - Authentication flows
-     - Error handling
-     - Data validation
-   - Context Understanding
-     - Request/Response patterns
-     - Parameter relationships
+## Architecture
 
-4. Documentation Analysis
+### 1. Initial Code Processing
 
-   - Comment Classification
-     - Parameter descriptions
-     - Return values
-     - Error documentation
-   - Information Extraction
-     - Parameter types
-     - Validation rules
-     - Response formats
-   - Constraint Detection
-     - Required fields
-     - Validation rules
+- Git Diff Detection
+  - Identify changed files
+- Code Extraction
+  - Extract route handlers
+  - Extract existing comments
+- Basic Preprocessing
+  - Remove unnecessary whitespace
+  - Normalize line endings
 
-5. Structured Data Creation
+### 2. NLP Analysis Pipeline
 
-   - Endpoint Information
-     - Path
-     - Method
-     - Resource type
-   - Parameters
-     - Path parameters
-     - Query parameters
-     - Request body
-   - Responses
-     - Success scenarios
-     - Error cases
-   - Validation
-     - Input constraints
-     - Business rules
+- CodeBERT Processing
+  - Generate code embeddings
+  - Semantic code understanding
+- Token Classification
+  - CRUD operation detection
+  - API endpoint classification
+- Named Entity Recognition (NER)
+  - Route paths
+  - HTTP methods
+  - Variable names
+  - Function names
+  - Status codes
+- Semantic Role Labeling
+  - Action identification
+  - Resource detection
+  - Parameter role assignment
 
-6. LLM Integration
+### 3. Pattern Recognition & Documentation Analysis
 
-   - Prompt Generation
-     - Context building
-     - Template selection
-   - LLM Processing
-     - Documentation generation
-     - Validation rules
-   - Output Formatting
-     - OpenAPI specification
-     - Swagger YAML
+- Transformer Model Analysis
+  - CRUD patterns
+  - Authentication flows
+  - Error handling
+  - Data validation
+- Information Extraction
+  - Parameter types
+  - Validation rules
+  - Response formats
+- Constraint Detection
+  - Required fields
+  - Validation rules
 
-7. Code Update
-   - Generate documentation
-     - Update existing docs
-     - Create new docs
+### 4. LLM Integration & Code Update
 
-### Future improvements
+- Prompt Generation
+- Documentation Generation
+- Code Base Updates
 
-- Extend to multiple backend frameworks not just expressjs (which is the most popular)
-- We could make a local cli version that works without making a github app
+## Setup
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/auto_swagger.git
+cd auto_swagger
+```
+
+2. Create and activate a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+
+4. Command line usage:
+```bash
+python -m main --repo-path path/to/express/app
+```
+
+## Configuration
+
+The project uses a config to change the model you want:
+
+```python
+@dataclass
+class LLMConfig:
+    model_name: str = "deepseek-ai/deepseek-coder-1.3b-instruct"
+    max_new_tokens: int = 8192
+    temperature: float = 0.2
+    top_k: int = 50
+    top_p: float = 0.95
+    max_retries: int = 3
+```
+
+## Future Improvements
+
+- Support for additional backend frameworks beyond Express.js
+- Local CLI version without GitHub app dependency
+- Enhanced pattern recognition
+- Additional documentation formats
+- Real-time documentation updates
