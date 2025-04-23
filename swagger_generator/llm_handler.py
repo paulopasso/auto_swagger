@@ -113,7 +113,7 @@ class LLMHandler:
         # Create a result container and done flag for the thread
         result_container = {"outputs": None, "error": None}
         done_flag = threading.Event()
-        timeout_seconds = 180  # 3 minutes timeout
+        timeout_seconds = 2000  # 3 minutes timeout
         
         def generate_with_timeout():
             try:
