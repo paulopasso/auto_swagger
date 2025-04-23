@@ -51,45 +51,48 @@ class ApiDocParser:
                 r"@(Get|Post|Put|Delete|Patch)",
                 r"express\.Router\(\)",
                 r"createRouter",
-                r"FastAPI",
-                r"@app\.(get|post|put|delete|patch)",
-                r"flask\.(route|get|post|put|delete|patch)",
-                r"Blueprint",
             ]
             return any(re.search(p, content, re.I) for p in route_patterns)
         except Exception:
             return False
 
     @staticmethod
-    def parse_files(files: List[str]) -> Dict[str, List[dict]]:
-        """Parse multiple files and return their API documentation.
+    def parse_files(files: List[str]) -> List[dict]:
+        """Parse multiple files and return their API documentation as a flattened list.
 
         Args:
             files: List of file paths to parse
 
         Returns:
-            Dictionary mapping file paths to their API documentation
+            List of API documentation objects for all files
         """
-        results = {}
+        all_routes = []
         for filepath in files:
             if ApiDocParser.is_api_file(filepath):
                 try:
                     parser = ApiDocParser(filepath)
                     docs = parser.extract_api_info()
                     if docs:  # Only include if API docs were found
-                        results[filepath] = docs
+                        all_routes.extend(docs)
                 except Exception as e:
                     print(f"Error parsing {filepath}: {str(e)}")
-        return results
+        return all_routes
 
-    def __init__(self, js_filepath: str):
+    def __init__(self, js_filepath: str, repo_root: str | None = None):
         """Initialize the API documentation parser.
 
         Args:
             js_filepath: Path to the JavaScript/TypeScript file to parse
+            repo_root: Root path of the repository. If provided, paths will be relative to this.
         """
         self.filepath = js_filepath
-        self.filename = os.path.basename(js_filepath)
+        
+        # Calculate relative path from repo root if provided, otherwise from current directory
+        if repo_root:
+            self.relative_path = os.path.relpath(js_filepath, repo_root)
+        else:
+            self.relative_path = os.path.basename(js_filepath)
+        
         if not os.path.exists(self.filepath):
             raise FileNotFoundError(f"File not found: {self.filepath}")
 
@@ -117,10 +120,10 @@ class ApiDocParser:
         """Initialize the NLP pipeline with error handling and fallbacks."""
         try:
             self.nlp = spacy.load("en_core_web_sm")
-            print(f"spaCy model loaded successfully for {self.filename}.")
+            print(f"spaCy model loaded successfully for {self.relative_path}.")
         except Exception as e:
             msg = (
-                f"Warning: spaCy model failed ({e}) for {self.filename}. "
+                f"Warning: spaCy model failed ({e}) for {self.relative_path}. "
                 "Using basic tokenization."
             )
             print(msg)
@@ -154,18 +157,29 @@ class ApiDocParser:
         )
 
         for m in pattern.finditer(self.code):
-            routes.append(
-                {
-                    "method": m.group("method"),
-                    "path": m.group("path"),
-                    "handler_text": m.group("handler").strip(),
-                    "handler_start": m.start(
-                        "handler"
-                    ),  # Position where handler text starts
-                    "line": self.code.count("\n", 0, m.start())
-                    + 1,  # Estimate line number
+            start_line = self.code.count('\n', 0, m.start()) + 1  # Route definition start
+            handler_start = m.start('handler')
+            handler_text = m.group('handler').strip()
+            
+            # Find the end of the handler function
+            handler_body = self._extract_function_body(handler_start)
+            if handler_body:
+                # Calculate end line by counting newlines up to the end of handler body
+                end_line = self.code.count('\n', 0, m.start() + len(m.group(0)) + len(handler_body)) + 1
+            else:
+                # If no function body found, use the route definition line as end line
+                end_line = start_line
+
+            routes.append({
+                'method': m.group('method'),
+                'path': m.group('path'),
+                'handler_text': handler_text,
+                'handler_start': handler_start,
+                'line': {
+                    'beginning': start_line,
+                    'end': end_line
                 }
-            )
+            })
 
         return routes
 
@@ -1068,24 +1082,62 @@ class ApiDocParser:
             # Remove empty parameter categories (path, query, body) if no params found
             params = {k: v for k, v in params.items() if v}
 
-            docs.append(
-                {
-                    "codeContext": {
-                        "filename": self.filename,
-                        "functionName": func_name,
-                        "line": route["line"],
-                        "general_purpose": purpose,
-                    },
-                    "apiDetails": {
+            docs.append({
+                "codeContext": {
+                    "filename": self.relative_path,  # Use relative path instead of just filename
+                    "functionName": func_name,
+                    "line": route["line"],
+                    "general_purpose": purpose
+                },
+                "apiDetails": {
+                    resource.lower() + "s": {  # Pluralize resource name
                         "endpoint": {
                             "path": path,
-                            "method": method,
-                            "resourceType": resource,
+                            "methods": [method],
+                            "resourceType": resource
                         },
-                        "parameters": params,
-                        "responses": standardized_responses,
-                        "validation": validation,
-                    },
+                        "parameters": params if params else {},
+                        "responses": {
+                            "success": self._convert_success_response(standardized_responses["successResponse"], method),
+                            "error": self._convert_error_responses(standardized_responses["errorResponses"])
+                        }
+                    }
                 }
-            )
+            })
         return docs
+
+    def _convert_success_response(self, success_response, method):
+        """Convert success response to match context.py format."""
+        if not success_response:
+            return {}
+            
+        method_map = {
+            "GET": "get_one" if "/{" in self.filepath else "get_all",
+            "POST": "create",
+            "PUT": "update",
+            "PATCH": "update",
+            "DELETE": "delete"
+        }
+        
+        action = method_map.get(method, "handle")
+        
+        return {
+            action: {
+                "statusCode": success_response["statusCode"],
+                "description": success_response["description"],
+                **({"schema": success_response["schema"]} if "schema" in success_response else {})
+            }
+        }
+
+    def _convert_error_responses(self, error_responses):
+        """Convert error responses to match context.py format."""
+        if not error_responses:
+            return {}
+            
+        result = {}
+        for error in error_responses:
+            result[str(error["statusCode"])] = {
+                "description": error["description"],
+                "conditions": [error["description"]]  # Use description as condition
+            }
+        return result
