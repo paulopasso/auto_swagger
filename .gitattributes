@@ -1,0 +1,5 @@
+lora_adapters/adapter_model.safetensors filter=lfs diff=lfs merge=lfs -text
+lora_adapters/checkpoint-20/optimizer.pt filter=lfs diff=lfs merge=lfs -text
+lora_adapters/**/*.pt filter=lfs diff=lfs merge=lfs -text
+lora_adapters/**/*.bin filter=lfs diff=lfs merge=lfs -text
+lora_adapters/**/*.safetensors filter=lfs diff=lfs merge=lfs -text
