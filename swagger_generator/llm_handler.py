@@ -5,35 +5,61 @@ from typing import List, Optional, Dict, Any
 from .models import Change
 from .config import LLMConfig
 import json
+import threading
+import time
+    
+STOP_TOKEN = "<|endofjsdoc|>"
 
 class LLMHandler:
     """Handles all LLM operations for generating swagger documentation."""
-    
+
     def __init__(self, config: LLMConfig):
         self.config = config
-        
-        # Replace with your actual HF repo ID
-        hf_model_id = config.lora_adapter_id
-        
-        # Load the tokenizer from HF
+
+        # 1) Load the tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(
-            hf_model_id,
+            config.model_name,
             trust_remote_code=True
         )
         
-        # Load the base model
+        # Add special tokens
+        special_tokens_dict = {'additional_special_tokens': [STOP_TOKEN]}
+        self.tokenizer.add_special_tokens(special_tokens_dict)
+        self.tokenizer.pad_token = "[PAD]"
+        self.tokenizer.padding_side = "left"
+        
+        # 2) Configure low-resource options for model loading
+        print(f"Loading model on {self._get_device()} with optimizations...")
+        
+        # Let's use 8-bit quantization if on CUDA to save memory
+        use_8bit = torch.cuda.is_available()
+        
+        # Load the base causal LM with memory optimizations
         base_model = AutoModelForCausalLM.from_pretrained(
             config.model_name,
             trust_remote_code=True,
-            torch_dtype=torch.bfloat16
-        ).to(self._get_device())
-        
-        # Apply the LoRA adapter from HF
-        self.model = PeftModel.from_pretrained(
-            base_model,
-            hf_model_id
+            torch_dtype=torch.float16,  # Use float16 instead of bfloat16
+            load_in_8bit=use_8bit,     # Use 8-bit quantization when possible
+            device_map="auto",         # Let the system decide on device mapping
+            low_cpu_mem_usage=True     # Optimize for low CPU memory
         )
         
+        # Resize embeddings to handle new tokens
+        base_model.resize_token_embeddings(len(self.tokenizer))
+        base_model.config.pad_token_id = self.tokenizer.pad_token_id
+        
+        # 3) Apply the LoRA adapter with proper device mapping
+        self.model = PeftModel.from_pretrained(
+            base_model,
+            config.lora_adapter_id,
+            torch_dtype=torch.float16,
+            device_map="auto",  # Let the system decide device mapping
+        )
+        
+        # Enable gradient checkpointing to save memory
+        if hasattr(self.model, "enable_gradient_checkpointing"):
+            self.model.enable_gradient_checkpointing()
+    
     @staticmethod
     def _get_device() -> torch.device:
         """Determines the appropriate device for model execution."""
@@ -68,35 +94,115 @@ class LLMHandler:
         return None
         
     def _generate_response(self, system_prompt: str, user_prompt: str) -> List[Dict[str, str]]:
-        """Generates a response from the model."""
+        """Generates a response from the model with timeout support."""
         messages = [
             {'role': 'system', 'content': system_prompt},
             {'role': 'user', 'content': user_prompt}
         ]
         
+        # Apply chat template with proper attention mask
         inputs = self.tokenizer.apply_chat_template(
             messages,
             add_generation_prompt=True,
             return_tensors="pt"
         ).to(self._get_device())
         
-        outputs = self.model.generate(
-            inputs,
-            max_new_tokens=self.config.max_new_tokens,
-            do_sample=True,
-            temperature=self.config.temperature,
-            top_k=self.config.top_k,
-            top_p=self.config.top_p,
-            num_return_sequences=1,
-            eos_token_id=self.tokenizer.eos_token_id,
-        )
+        # Create proper attention mask
+        attention_mask = torch.ones_like(inputs).to(self._get_device())
         
-        generated_text = self.tokenizer.decode(
-            outputs[0][len(inputs[0]):],
-            skip_special_tokens=True
-        )
+        # Create a result container and done flag for the thread
+        result_container = {"outputs": None, "error": None}
+        done_flag = threading.Event()
+        timeout_seconds = 180  # 3 minutes timeout
         
-        return [{"generated_text": generated_text}]
+        def generate_with_timeout():
+            try:
+                print("Attempting generation with reduced parameters...")
+                # Reduce max_new_tokens to avoid excessively long generation
+                reduced_tokens = min(self.config.max_new_tokens, 2048)
+                print(f"Using max_new_tokens={reduced_tokens} (reduced from {self.config.max_new_tokens})")
+                
+                # Start a progress indicator
+                start_time = time.time()
+                
+                # First try with deterministic generation (no sampling) and reduced tokens
+                result_container["outputs"] = self.model.generate(
+                    inputs,
+                    attention_mask=attention_mask,
+                    max_new_tokens=reduced_tokens,
+                    do_sample=False,  # Deterministic generation
+                    num_return_sequences=1,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                    eos_token_id=self.tokenizer.eos_token_id,
+                    use_cache=True,
+                )
+                
+                print(f"Generation completed in {time.time() - start_time:.2f} seconds")
+                
+            except Exception as e:
+                result_container["error"] = e
+                print(f"Generation failed with error: {e}")
+            finally:
+                done_flag.set()
+        
+        # Start generation in a separate thread
+        print("Starting generation in background thread...")
+        generation_thread = threading.Thread(target=generate_with_timeout)
+        generation_thread.daemon = True
+        generation_thread.start()
+        
+        # Monitor progress and check for timeout
+        start_time = time.time()
+        progress_interval = 10  # seconds
+        next_progress = start_time + progress_interval
+        
+        while not done_flag.is_set():
+            time.sleep(1)
+            current_time = time.time()
+            
+            # Print progress updates
+            if current_time >= next_progress:
+                elapsed = current_time - start_time
+                print(f"Still generating... ({elapsed:.0f} seconds elapsed)")
+                next_progress = current_time + progress_interval
+            
+            # Check for timeout
+            if current_time - start_time > timeout_seconds:
+                print(f"Generation timed out after {timeout_seconds} seconds")
+                # We can't actually stop the thread, but we can proceed with a fallback
+                break
+        
+        # Check results
+        if not done_flag.is_set() or result_container["error"] is not None:
+            # Either timed out or had an error
+            error_msg = str(result_container["error"]) if result_container["error"] else "Generation timed out"
+            print(f"Using fallback response due to: {error_msg}")
+            
+            # Create a simple fallback response
+            return [{"generated_text": f"""```json
+{{
+  "changes": [
+    {{
+      "filepath": "Unable to generate documentation",
+      "code": "/**\\n * @swagger\\n * /api/error:\\n *   get:\\n *     description: Error during generation - {error_msg[:100]}\\n */",
+      "description": "Generation failed or timed out"
+    }}
+  ]
+}}```"""
+            }]
+        
+        # Process successful generation
+        outputs = result_container["outputs"]
+        
+        try:
+            generated_text = self.tokenizer.decode(
+                outputs[0][len(inputs[0]):],
+                skip_special_tokens=True
+            )
+            return [{"generated_text": generated_text}]
+        except Exception as e:
+            print(f"Error decoding generated text: {e}")
+            return [{"generated_text": "Error decoding model output"}]
         
     @staticmethod
     def _get_system_prompt() -> str:
@@ -226,4 +332,4 @@ API Context:
             if 'text' in locals():
                 print("\nRaw text that caused the error:")
                 print(text)
-            return None 
+            return None

@@ -8,7 +8,7 @@ class GitHandler:
     """Handles all git-related operations for the swagger documentation updates."""
     
     def __init__(self, repo_path: Path, config: GitConfig):
-        self.repo = Repo(repo_path)
+        self.repo = Repo(str(repo_path))
         self.config = config
         
     def setup_branch(self) -> None:
@@ -24,7 +24,10 @@ class GitHandler:
         if not successful_changes:
             return
             
-        self.repo.index.add([change.filepath for change in successful_changes])
+        # Convert Path objects to strings if needed
+        file_paths = [str(change.filepath) for change in successful_changes]
+        self.repo.index.add(file_paths)
+        
         commit_message = f"{self.config.commit_message}\n\n" + \
                         "\n".join(f"- {change.description}" for change in successful_changes)
         self.repo.index.commit(commit_message)
