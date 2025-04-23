@@ -4,7 +4,7 @@ from typing import Optional
 
 @dataclass
 class LLMConfig:
-    model_name: str = "deepseek-ai/deepseek-coder-1.3b-instruct"
+    model_name: str = "deepseek-ai/DeepSeek-V3-0324"
     max_new_tokens: int = 8192
     temperature: float = 0.2
     top_k: int = 50

@@ -1,29 +1,18 @@
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+import os
+from dotenv import load_dotenv
+from huggingface_hub import InferenceClient
 from typing import List, Optional, Dict, Any
 from .models import Change
 from .config import LLMConfig
 import json
+
+load_dotenv()
 
 class LLMHandler:
     """Handles all LLM operations for generating swagger documentation."""
     
     def __init__(self, config: LLMConfig):
         self.config = config
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            config.model_name,
-            trust_remote_code=True
-        )
-        self.model = AutoModelForCausalLM.from_pretrained(
-            config.model_name,
-            trust_remote_code=True,
-            torch_dtype=torch.bfloat16
-        ).to(self._get_device())
-        
-    @staticmethod
-    def _get_device() -> torch.device:
-        """Determines the appropriate device for model execution."""
-        return torch.device("mps" if torch.mps.is_available() else "cpu")
         
     def generate_documentation(self, context: List[Dict[str, Any]]) -> Optional[List[Change]]:
         """Generates swagger documentation for the given API contexts."""
@@ -59,28 +48,18 @@ class LLMHandler:
             {'role': 'system', 'content': system_prompt},
             {'role': 'user', 'content': user_prompt}
         ]
-        
-        inputs = self.tokenizer.apply_chat_template(
-            messages,
-            add_generation_prompt=True,
-            return_tensors="pt"
-        ).to(self._get_device())
-        
-        outputs = self.model.generate(
-            inputs,
-            max_new_tokens=self.config.max_new_tokens,
-            do_sample=True,
-            temperature=self.config.temperature,
-            top_k=self.config.top_k,
-            top_p=self.config.top_p,
-            num_return_sequences=1,
-            eos_token_id=self.tokenizer.eos_token_id,
+
+        client = InferenceClient(
+            provider="novita",
+            api_key=os.getenv("API_KEY"),
         )
-        
-        generated_text = self.tokenizer.decode(
-            outputs[0][len(inputs[0]):],
-            skip_special_tokens=True
+
+        completion = client.chat.completions.create(
+            model=self.config.model_name,
+            messages=messages,
         )
+
+        generated_text = completion.choices[0].message.content
         
         return [{"generated_text": generated_text}]
         
