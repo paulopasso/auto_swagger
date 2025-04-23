@@ -5,6 +5,7 @@ from typing import Optional
 @dataclass
 class LLMConfig:
     model_name: str = "deepseek-ai/deepseek-coder-1.3b-instruct"
+    lora_adapter_id: str = "paulopasso/auto-swagger"  # Replace with your HF repo ID
     max_new_tokens: int = 8192
     temperature: float = 0.2
     top_k: int = 50

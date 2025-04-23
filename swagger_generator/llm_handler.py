@@ -1,12 +1,10 @@
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from peft import PeftModel, PeftConfig
+from peft import PeftModel
 from typing import List, Optional, Dict, Any
 from .models import Change
 from .config import LLMConfig
 import json
-import os
-import requests
 
 class LLMHandler:
     """Handles all LLM operations for generating swagger documentation."""
@@ -14,44 +12,27 @@ class LLMHandler:
     def __init__(self, config: LLMConfig):
         self.config = config
         
-        # Check if we have LoRA adapters locally, if not, download them
-        lora_path = "./lora_adapters"
+        # Replace with your actual HF repo ID
+        hf_model_id = config.lora_adapter_id
         
-        if not os.path.exists(lora_path) or not os.path.exists(f"{lora_path}/adapter_model.safetensors"):
-            print("LoRA adapters not found locally, downloading from storage...")
-            self._download_lora_adapters()
+        # Load the tokenizer from HF
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            hf_model_id,
+            trust_remote_code=True
+        )
         
-        # Check if we have LoRA adapters
-        if os.path.exists(lora_path):
-            # Load the tokenizer from LoRA adapters (includes custom tokens)
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                lora_path,
-                trust_remote_code=True
-            )
-            
-            # Load the base model
-            base_model = AutoModelForCausalLM.from_pretrained(
-                config.model_name,
-                trust_remote_code=True,
-                torch_dtype=torch.bfloat16
-            ).to(self._get_device())
-            
-            # Apply the LoRA adapter
-            self.model = PeftModel.from_pretrained(
-                base_model,
-                lora_path
-            )
-        else:
-            # Fallback to just using the base model
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                config.model_name,
-                trust_remote_code=True
-            )
-            self.model = AutoModelForCausalLM.from_pretrained(
-                config.model_name,
-                trust_remote_code=True,
-                torch_dtype=torch.bfloat16
-            ).to(self._get_device())
+        # Load the base model
+        base_model = AutoModelForCausalLM.from_pretrained(
+            config.model_name,
+            trust_remote_code=True,
+            torch_dtype=torch.bfloat16
+        ).to(self._get_device())
+        
+        # Apply the LoRA adapter from HF
+        self.model = PeftModel.from_pretrained(
+            base_model,
+            hf_model_id
+        )
         
     @staticmethod
     def _get_device() -> torch.device:
@@ -246,21 +227,3 @@ API Context:
                 print("\nRaw text that caused the error:")
                 print(text)
             return None 
-
-    def _download_lora_adapters(self):
-        """Download LoRA adapters from cloud storage."""
-        os.makedirs("./lora_adapters", exist_ok=True)
-        
-        # Replace with your actual storage URLs
-        model_url = "https://your-storage-bucket.com/lora_adapters/adapter_model.safetensors"
-        
-        print(f"Downloading model from {model_url}...")
-        r = requests.get(model_url, stream=True)
-        with open("./lora_adapters/adapter_model.safetensors", 'wb') as f:
-            for chunk in r.iter_content(chunk_size=8192):
-                f.write(chunk)
-        
-        # Download other necessary files...
-        # ...
-        
-        print("LoRA adapters downloaded successfully") 
