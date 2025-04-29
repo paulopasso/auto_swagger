@@ -83,21 +83,40 @@ git clone https://github.com/yourusername/auto_swagger.git
 cd auto_swagger
 ```
 
-2. Create and activate a virtual environment:
+2. Install UV if you haven't already:
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-3. Install dependencies:
+3. Create a virtual environment and install dependencies:
 ```bash
-pip install -r requirements.txt
+uv venv
 ```
 
-
-4. Command line usage:
+4. Run the auto-swagger tool:
 ```bash
-python -m main --repo-path path/to/express/app
+# Run the main documentation generator
+uv run auto-swagger --repo-path path/to/express/app
+
+# Run the fine-tuning tool (if needed)
+uv run finetune
+```
+
+## Project Structure
+
+```
+auto_swagger/
+├── src/
+│   └── auto_swagger/         # Source code
+│       ├── config/          # Configuration management
+│       ├── finetune/        # Model fine-tuning utilities
+│       ├── parser/          # Code parsing and analysis
+│       └── swagger_generator/ # Documentation generation
+├── data/                    # Project data
+│   ├── jsdocs_finetune.jsonl # Fine-tuning dataset
+│   └── swagger_docs/        # Generated documentation
+├── pyproject.toml          # Project configuration
+└── README.md
 ```
 
 ## Configuration
