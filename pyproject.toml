@@ -78,3 +78,14 @@ dependencies = [
     "wheel>=0.45.1",
     "wrapt==1.17.2",
 ]
+
+[project.scripts]
+auto-swagger = "auto_swagger.main:main"
+finetune = "auto_swagger.finetune.finetune:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/auto_swagger"]
