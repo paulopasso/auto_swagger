@@ -10,22 +10,20 @@ from transformers import (
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 import json
 from datasets import Dataset
-from swagger_generator.generator_config import Config
-from config.settings import MODEL_OUTPUT_DIR, FINETUNE_DATA_PATH
+from auto_swagger.config.settings import MODEL_OUTPUT_DIR, FINETUNE_DATA_PATH
 
 class FineTuner:
-    def __init__(self, config: Config):
-        self.config = config
+    def __init__(self):
         self.output_dir = MODEL_OUTPUT_DIR
         self.jsonl_path = FINETUNE_DATA_PATH
         self.stop_token = "<|endofjsdoc|>"
         self.tokenizer = None
-        self.model = None
+        self.model_name = "deepseek-ai/deepseek-coder-1.3b-instruct"
         
     def setup_tokenizer(self):
         """Initialize the tokenizer with the model and stop token"""
         self.tokenizer = AutoTokenizer.from_pretrained(
-            self.config.llm.model_name,
+            self.model_name,
             trust_remote_code=True
         )
         
@@ -64,7 +62,7 @@ class FineTuner:
         print(f"Using device: {self.device}")
         
         self.model = AutoModelForCausalLM.from_pretrained(
-            self.config.llm.model_name,
+            self.model_name,
             torch_dtype=torch.bfloat16,
             trust_remote_code=True,
             device_map="auto"
@@ -175,8 +173,7 @@ def load_jsonl(file_path):
 
 def main():
     """Main entry point"""
-    config = Config.create()
-    finetuner = FineTuner(config)
+    finetuner = FineTuner()
     finetuner.setup_tokenizer()
     finetuner.load_model()
     finetuner.train()

@@ -1,12 +1,12 @@
 import argparse
-from parser.parser import ApiDocParser
+from auto_swagger.parser.parser import ApiDocParser
 from pathlib import Path
 
-from swagger_generator.generator_config import Config
-from swagger_generator.file_handler import FileHandler
-from swagger_generator.git_handler import GitHandler
-from swagger_generator.llm_handler import LLMHandler
-from swagger_generator.models import Change
+from auto_swagger.swagger_generator.generator_config import Config
+from auto_swagger.swagger_generator.file_handler import FileHandler
+from auto_swagger.swagger_generator.git_handler import GitHandler
+from auto_swagger.swagger_generator.llm_handler import LLMHandler
+from auto_swagger.swagger_generator.models import Change
 
 
 def parse_args() -> argparse.Namespace:
@@ -147,4 +147,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main() 
