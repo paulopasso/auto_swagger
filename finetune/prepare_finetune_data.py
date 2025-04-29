@@ -1,7 +1,7 @@
-import os
 import re
 import json
 from pathlib import Path
+from config.settings import PROJECT_ROOT, SWAGGER_DOCS_DIR, FINETUNE_DATA_PATH
 
 def prepare_finetune_data_jsdocs(input_dir, output_file, stop_token="<|endofjsdoc|>"):
     """
@@ -14,6 +14,10 @@ def prepare_finetune_data_jsdocs(input_dir, output_file, stop_token="<|endofjsdo
         output_file (str | Path): Path to the output JSONL file.
         stop_token (str): Token to append at the end of each completion.
     """
+    # Convert input paths to absolute paths
+    input_dir = Path(input_dir).resolve()
+    output_file = Path(output_file).resolve()
+
     # Regex to capture JSDoc block with @openapi and the following route stub
     pattern = re.compile(
         r"(/\*\*[\s\S]*?@openapi[\s\S]*?\*/)\s*"
@@ -22,7 +26,6 @@ def prepare_finetune_data_jsdocs(input_dir, output_file, stop_token="<|endofjsdo
     )
 
     examples = []
-    input_dir = Path(input_dir)
 
     for filepath in input_dir.rglob("*.js"):
         content = filepath.read_text(encoding='utf-8')
@@ -42,13 +45,10 @@ def prepare_finetune_data_jsdocs(input_dir, output_file, stop_token="<|endofjsdo
             completion = jsdoc.replace("\r\n", "\n") + "\n" + stop_token
 
             examples.append({
-                "filepath": str(filepath),
+                "filepath": str(filepath.relative_to(PROJECT_ROOT)),
                 "prompt": prompt,
                 "completion": completion
             })
-
-    # Ensure output directory exists
-    Path(output_file).parent.mkdir(parents=True, exist_ok=True)
 
     # Write JSONL
     with open(output_file, 'w', encoding='utf-8') as out_f:
@@ -59,4 +59,4 @@ def prepare_finetune_data_jsdocs(input_dir, output_file, stop_token="<|endofjsdo
 
 
 if __name__ == "__main__":
-    prepare_finetune_data_jsdocs("data/swagger_docs", "data/jsdocs_finetune.jsonl")
+    prepare_finetune_data_jsdocs(SWAGGER_DOCS_DIR, FINETUNE_DATA_PATH)
