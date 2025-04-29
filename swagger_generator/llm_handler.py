@@ -3,7 +3,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 from typing import List, Optional, Dict, Any
 from .models import Change
-from .config import LLMConfig
+from .generator_config import LLMConfig
 import json
 import threading
 import time
@@ -15,8 +15,9 @@ class LLMHandler:
 
     def __init__(self, config: LLMConfig):
         self.config = config
+        self.device = torch.device("mps" if torch.backends.mps.is_available() else 
+                            ("cuda" if torch.cuda.is_available() else "cpu"))
 
-        # 1) Load the tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(
             config.model_name,
             trust_remote_code=True
@@ -28,18 +29,15 @@ class LLMHandler:
         self.tokenizer.pad_token = "[PAD]"
         self.tokenizer.padding_side = "left"
         
-        # 2) Configure low-resource options for model loading
-        print(f"Loading model on {self._get_device()} with optimizations...")
         
-        # Let's use 8-bit quantization if on CUDA to save memory
-        use_8bit = torch.cuda.is_available()
+        # Determine appropriate dtype
+        dtype = torch.float16 if self.device.type in ["cuda", "mps"] else torch.float32
         
         # Load the base causal LM with memory optimizations
         base_model = AutoModelForCausalLM.from_pretrained(
             config.model_name,
             trust_remote_code=True,
-            torch_dtype=torch.float16,  # Use float16 instead of bfloat16
-            load_in_8bit=use_8bit,     # Use 8-bit quantization when possible
+            torch_dtype=dtype,
             device_map="auto",         # Let the system decide on device mapping
             low_cpu_mem_usage=True     # Optimize for low CPU memory
         )
@@ -48,11 +46,11 @@ class LLMHandler:
         base_model.resize_token_embeddings(len(self.tokenizer))
         base_model.config.pad_token_id = self.tokenizer.pad_token_id
         
-        # 3) Apply the LoRA adapter with proper device mapping
+        # Apply the LoRA adapter with proper device mapping
         self.model = PeftModel.from_pretrained(
             base_model,
             config.lora_adapter_id,
-            torch_dtype=torch.float16,
+            torch_dtype=dtype,
             device_map="auto",  # Let the system decide device mapping
         )
         
@@ -60,10 +58,9 @@ class LLMHandler:
         if hasattr(self.model, "enable_gradient_checkpointing"):
             self.model.enable_gradient_checkpointing()
     
-    @staticmethod
-    def _get_device() -> torch.device:
-        """Determines the appropriate device for model execution."""
-        return torch.device("mps" if torch.mps.is_available() else "cpu")
+    def _get_device(self) -> torch.device:
+        """Returns the device for model execution."""
+        return self.device
         
     def generate_documentation(self, context: List[Dict[str, Any]]) -> Optional[List[Change]]:
         """Generates swagger documentation for the given API contexts."""
@@ -325,7 +322,7 @@ API Context:
                     file_offsets[filepath] = current_offset + code_lines
                 else:
                     print(f"\nWarning: Context mismatch for file {change_data['filepath']}")
-                    raise ValueError(f"Context mismatch: LLM generated documentation for wrong file order")
+                    raise ValueError("Context mismatch: LLM generated documentation for wrong file order")
             
             return processed_changes
             
