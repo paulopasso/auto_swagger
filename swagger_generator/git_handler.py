@@ -3,7 +3,7 @@ from typing import List, Set
 
 from git import Repo
 
-from .config import GitConfig
+from .generator_config import GitConfig
 from .models import Change
 
 

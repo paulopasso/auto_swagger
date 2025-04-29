@@ -1,11 +1,8 @@
 import argparse
-import json
-from datetime import datetime
 from parser.parser import ApiDocParser
 from pathlib import Path
-from typing import Set
 
-from swagger_generator.config import Config
+from swagger_generator.generator_config import Config
 from swagger_generator.file_handler import FileHandler
 from swagger_generator.git_handler import GitHandler
 from swagger_generator.llm_handler import LLMHandler

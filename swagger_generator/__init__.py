@@ -5,7 +5,7 @@ This package provides functionality to automatically generate Swagger documentat
 for API endpoints using LLM-powered code analysis.
 """
 
-from .config import Config, LLMConfig, GitConfig
+from .generator_config import Config, LLMConfig, GitConfig
 from .models import Change
 from .git_handler import GitHandler
 from .file_handler import FileHandler
