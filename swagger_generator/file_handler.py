@@ -29,7 +29,7 @@ class FileHandler:
         """
         try:
             # Convert the filepath to a Path object if it's a string
-            change_path = Path(change.filepath) if isinstance(change.filepath, str) else change.filepath
+            change_path = Path(change.filepath)
             
             # If the path is relative, make it absolute using the repo path
             if not change_path.is_absolute():
